@@ -177,7 +177,7 @@ export function UploadPanel({ businessId, onImported }: { businessId: string; on
         <label htmlFor={`csv-${businessId}`} className="btn-secondary cursor-pointer">
           {file ? "Choose a different file" : "Choose CSV file"}
         </label>
-        <div className="text-2xs text-ink-3">Max 5 MB · columns: record_type, date, amount, … (see template)</div>
+        <div className="text-2xs text-ink-3">Max 4 MB · columns: record_type, date, amount, … (see template)</div>
       </div>
 
       {busy === "validate" && (

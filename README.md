@@ -22,7 +22,7 @@ Requirements: **Python 3.11+** (tested on 3.13) and **Node.js 20+** (tested on 2
 cd backend
 python3 -m venv .venv
 source .venv/bin/activate          # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime deps + pytest
 uvicorn app.main:app --port 8000   # creates the SQLite DB and seeds the demo on first start
 
 # 2. Frontend (Next.js on :3000), in a second terminal
@@ -212,6 +212,19 @@ frontend/
   src/components/   shell, theme, charts (Recharts), score table, upload flow
 dist/               backup zips of frontend and backend source
 ```
+
+## Deploying to Vercel
+
+`vercel.json` at the repo root deploys both apps as one Vercel project with two services:
+
+| Service | Root | Public path |
+|---|---|---|
+| `backend` (FastAPI, entrypoint `app/main.py`) | `backend/` | `/api/*` |
+| `frontend` (Next.js) | `frontend/` | everything else |
+
+The browser calls `/api/*` on the same domain, so no CORS setup or service bindings are needed. Locally, Next.js proxies `/api/*` to `BACKEND_URL`; on Vercel that proxy is switched off and the top-level rewrite does the routing. To run both services together locally the Vercel way, use `vercel dev`.
+
+**Set `DATABASE_URL` (e.g. Supabase) in the Vercel project settings.** Without it, the backend falls back to SQLite in `/tmp`. That copy is reseeded on every cold start and is not shared between function instances, so uploads, progress and reassessments would not persist reliably. Uploads on Vercel are limited to 4 MB per file.
 
 ## Troubleshooting
 

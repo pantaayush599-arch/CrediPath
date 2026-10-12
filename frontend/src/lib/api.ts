@@ -224,7 +224,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     res = await fetch(`/api${path}`, { cache: "no-store", ...init });
   } catch {
-    throw new ApiError(0, "Cannot reach the CrediPath API. Is the backend running on port 8000?");
+    throw new ApiError(0, "Cannot reach the CrediPath API. If running locally, start the backend on port 8000.");
   }
   const text = await res.text();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -238,7 +238,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     const d = body?.detail;
     let msg = typeof d === "string" ? d : d?.message;
     if (!msg && Array.isArray(d)) msg = d.map((x: { msg: string }) => x.msg.replace("Value error, ", "")).join("; ");
-    if (!msg && res.status >= 500) msg = "The CrediPath API is not responding. Start the backend (port 8000) and try again.";
+    if (!msg && res.status >= 500) msg = "The CrediPath API is not responding. If running locally, start the backend (port 8000) and try again.";
     throw new ApiError(res.status, msg || `Request failed (${res.status})`, d);
   }
   return body as T;

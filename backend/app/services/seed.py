@@ -9,18 +9,45 @@ from datetime import date
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from ..db import DATA_DIR, Base, engine
+import os
+import threading
+
+from ..db import ASSETS_DIR, Base, SessionLocal, engine
 from ..models import ActionProgress, Business
 from ..scoring.record_schema import COLUMNS
 from . import synthetic
 from .assessment import run_assessment
 from .csv_ingest import store_rows, validate_csv
 
-SAMPLES_DIR = DATA_DIR / "samples"
+SAMPLES_DIR = ASSETS_DIR / "samples"
+
+_ready = False
+_ready_lock = threading.Lock()
 
 
 def init_db() -> None:
     Base.metadata.create_all(engine)
+
+
+def ensure_ready() -> list[str]:
+    """Create tables and seed the demo once per process.
+
+    Called from the startup hook and again lazily on the first request, because
+    serverless runtimes do not always run ASGI lifespan events.
+    """
+    global _ready
+    if _ready:
+        return []
+    with _ready_lock:
+        if _ready:
+            return []
+        init_db()
+        created: list[str] = []
+        if os.environ.get("CREDIPATH_AUTO_SEED", "1") != "0":
+            with SessionLocal() as db:
+                created = seed_demo(db)
+        _ready = True
+        return created
 
 
 def records_to_csv(records: list[dict]) -> str:

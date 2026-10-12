@@ -26,7 +26,7 @@ from ..scoring.record_schema import (
     REQUIRED_BY_TYPE,
 )
 
-MAX_BYTES = 5 * 1024 * 1024
+MAX_BYTES = 4 * 1024 * 1024  # stays under Vercel's 4.5 MB request body limit
 MAX_ROWS = 50_000
 MAX_LISTED_ISSUES = 200
 

@@ -2,7 +2,9 @@
 
 Uses ``DATABASE_URL`` when set (e.g. a Supabase Postgres connection string,
 ``postgresql+psycopg://user:pass@host:5432/postgres``); otherwise a local
-SQLite file at ``backend/data/credipath.db``.
+SQLite file at ``backend/data/credipath.db``. On Vercel (read-only filesystem
+except /tmp) the SQLite fallback lives in /tmp and is reset on every cold start,
+so a real deployment should set ``DATABASE_URL``.
 """
 
 from __future__ import annotations
@@ -14,8 +16,12 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 BACKEND_DIR = Path(__file__).resolve().parent.parent
-DATA_DIR = BACKEND_DIR / "data"
-DATA_DIR.mkdir(exist_ok=True)
+# Bundled, read-only assets (sample CSVs) ship with the code.
+ASSETS_DIR = BACKEND_DIR / "data"
+ON_VERCEL = bool(os.environ.get("VERCEL"))
+# Writable location for the SQLite fallback.
+DATA_DIR = Path("/tmp/credipath") if ON_VERCEL else ASSETS_DIR
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
 def database_url() -> str:
@@ -63,6 +69,9 @@ def backend_label() -> str:
 
 
 def get_session():
+    from .services.seed import ensure_ready  # local import avoids a cycle
+
+    ensure_ready()
     db = SessionLocal()
     try:
         yield db
