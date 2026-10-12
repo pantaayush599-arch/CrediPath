@@ -183,3 +183,22 @@ def test_every_seed_scores_within_range(biz):
     assert r["overall_score"] is not None and 0 <= r["overall_score"] <= 100
     for i in r["indicators"]:
         assert i["sub_score"] is None or 0 <= i["sub_score"] <= 100
+
+
+def _conf(biz_id):
+    biz = [b for b in all_businesses() if b.id == biz_id][0]
+    return score_records(to_frame(biz.records))["confidence"]
+
+
+def test_confidence_levels_and_reasons():
+    raj = _conf("rajs-bakery")
+    assert raj["level"] == "medium"
+    status = {c["key"]: c["status"] for c in raj["checks"]}
+    assert status == {"bank_months": "pass", "completeness": "warn", "missing_indicators": "pass"}
+    # A cash/UPI-only shop has no invoices: not applicable, not a gap.
+    meena = _conf("meena-general-store")
+    assert meena["level"] == "high"
+    assert "not applicable: invoice collection" in meena["checks"][2]["value"]
+    tiffin = _conf("green-leaf-tiffin")
+    assert tiffin["level"] == "low"
+    assert {c["key"] for c in tiffin["checks"] if c["status"] == "fail"} >= {"bank_months", "completeness"}

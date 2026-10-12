@@ -93,7 +93,7 @@ def run_assessment(db: Session, business: Business, trigger: str, upload_id: int
         confidence=result["confidence"]["level"],
         confidence_reasons=result["confidence"]["reasons"],
         record_count=int((df.date <= result["window"].as_of).sum()),
-        summary=_jsonable(summary),
+        summary=_jsonable({**summary, "confidence_checks": result["confidence"]["checks"]}),
         monthly=_monthly_rows(result["monthly"]),
     )
     for pos, ind in enumerate(result["indicators"]):

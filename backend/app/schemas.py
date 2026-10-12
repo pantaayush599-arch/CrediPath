@@ -39,6 +39,8 @@ class BusinessOut(BaseModel):
     latest_score: float | None = None
     latest_display_score: int | None = None
     confidence: str | None = None
+    confidence_reasons: list[str] = []
+    confidence_checks: list[dict[str, Any]] = []
     verification_count: int = 0
     flag_count: int = 0
     as_of_date: str | None = None

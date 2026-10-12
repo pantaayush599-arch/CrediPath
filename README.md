@@ -92,6 +92,18 @@ No API keys, paid services or external financial integrations are needed.
   - sales register vs. bank income gaps
   - overdue receivables and late EMIs
 
+## Confidence (high / medium / low)
+
+Confidence says how much evidence sits behind a score, not whether the score is good. Each assessment runs three checks:
+
+| Check | Pass | Warning | Fail |
+|---|---|---|---|
+| Bank / UPI history in the 12-month window | 9+ months | 6–8 | fewer than 6 |
+| Record completeness (data-completeness sub-score) | 75+ | 40–74 | below 40 |
+| Applicable indicators that could not be scored | none | 1–2 | more than 2 |
+
+**High** = all three pass, **medium** = at least one warning, **low** = any check fails. An indicator that does not apply (invoice collection for a cash/UPI-only shop) is not counted as missing. The checks and their values are shown next to every confidence label: "Why?" on the portfolio, a panel on the assessment page, and "How sure is this score?" on the owner page. Thresholds live in `CONFIDENCE_RULES` in `backend/app/scoring/config.py`.
+
 ## CSV format
 
 ```
@@ -145,7 +157,7 @@ The PostgreSQL path was tested against a local PostgreSQL 16 server (the full te
 
 ```bash
 cd backend && source .venv/bin/activate
-python -m pytest -q                                       # 35 tests, temporary SQLite DB
+python -m pytest -q                                       # 36 tests, temporary SQLite DB
 DATABASE_URL=postgresql://user:pass@localhost/db python -m pytest -q   # same suite on PostgreSQL
 
 cd frontend && npm run typecheck && npm run build

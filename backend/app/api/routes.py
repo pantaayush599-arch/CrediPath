@@ -69,6 +69,8 @@ def _business_out(db: Session, biz: Business) -> dict:
         "latest_score": a.overall_score if a else None,
         "latest_display_score": a.display_score if a else None,
         "confidence": a.confidence if a else None,
+        "confidence_reasons": a.confidence_reasons if a else [],
+        "confidence_checks": (a.summary or {}).get("confidence_checks", []) if a else [],
         "verification_count": sum(1 for f in a.flags if f.requires_verification) if a else 0,
         "flag_count": len(a.flags) if a else 0,
         "as_of_date": a.as_of_date.isoformat() if a else None,

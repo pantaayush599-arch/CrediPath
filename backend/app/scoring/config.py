@@ -18,6 +18,14 @@ SCORING_VERSION = "rules-v1.0"
 STRENGTH_MIN = 75
 CONCERN_BELOW = 55
 
+# Confidence: three checks, each pass / warn / fail. Any fail -> low,
+# otherwise any warn -> medium, otherwise high.
+CONFIDENCE_RULES = {
+    "bank_months": {"pass": 9, "warn": 6},          # months of bank/UPI data in the window
+    "completeness": {"pass": 75, "warn": 40},       # data-completeness sub-score
+    "missing_indicators": {"pass": 0, "warn": 2},   # applicable indicators that could not be scored
+}
+
 
 @dataclass(frozen=True)
 class IndicatorConfig:
@@ -196,6 +204,7 @@ def config_as_dict() -> dict:
         "window_months": WINDOW_MONTHS,
         "formula": "Overall score = sum(sub-score x weight); weights of indicators without enough data are re-normalised over the scored indicators.",
         "bands": {"strength_min": STRENGTH_MIN, "concern_below": CONCERN_BELOW},
+        "confidence_rules": CONFIDENCE_RULES,
         "indicators": [
             {
                 "key": i.key,

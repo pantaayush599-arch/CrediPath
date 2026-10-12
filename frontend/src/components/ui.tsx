@@ -1,8 +1,8 @@
 "use client";
 
-import { AlertOctagon, AlertTriangle, CheckCircle2, Info, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
+import { AlertOctagon, AlertTriangle, CheckCircle2, Info, Loader2, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 import Link from "next/link";
-import type { Band, Flag } from "@/lib/api";
+import type { Band, ConfidenceCheck, Flag } from "@/lib/api";
 
 export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: string; title: React.ReactNode; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
   return (
@@ -98,6 +98,61 @@ export function ConfidenceChip({ level }: { level: string | null }) {
   if (!level) return null;
   const cls = level === "high" ? "bg-good-soft text-good" : level === "medium" ? "bg-sunken text-ink-2" : "bg-bad-soft text-bad";
   return <span className={`chip ${cls}`}>{level} confidence</span>;
+}
+
+export const CONFIDENCE_RULE_TEXT = "High: all three checks pass. Medium: at least one warning. Low: any check fails.";
+
+const CHECK_STYLE = {
+  pass: { icon: <CheckCircle2 size={14} />, cls: "text-good", label: "Pass" },
+  warn: { icon: <AlertTriangle size={14} />, cls: "text-warn", label: "Warning" },
+  fail: { icon: <XCircle size={14} />, cls: "text-bad", label: "Fail" },
+};
+
+/** The three checks that decide high / medium / low confidence. */
+export function ConfidenceChecks({ checks, compact = false }: { checks: ConfidenceCheck[]; compact?: boolean }) {
+  if (!checks?.length) return null;
+  return (
+    <ul className={compact ? "space-y-1" : "space-y-2"}>
+      {checks.map((c) => {
+        const st = CHECK_STYLE[c.status];
+        return (
+          <li key={c.key} className="flex items-start gap-2 text-xs">
+            <span className={`mt-px shrink-0 ${st.cls}`} aria-label={st.label} title={st.label}>
+              {st.icon}
+            </span>
+            <span className="min-w-0">
+              <span className="font-medium text-ink">{c.label}:</span> <span className="text-ink-2">{c.value}</span>
+              {c.detail && <span className="block text-ink-3">{c.detail}</span>}
+              {!compact && <span className="block text-2xs text-ink-3">{c.rule}</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/** Chip plus an expandable "why" with the checks behind it. */
+export function ConfidenceWithReasons({ level, checks, reasons }: { level: string | null; checks: ConfidenceCheck[]; reasons?: string[] }) {
+  if (!level) return null;
+  const issues = checks.filter((c) => c.status !== "pass");
+  return (
+    <details className="group">
+      <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-1.5">
+          <ConfidenceChip level={level} />
+          <span className="text-2xs text-accent underline-offset-2 group-open:underline">Why?</span>
+        </span>
+        {reasons && level !== "high" && <span className="mt-1 block max-w-[220px] text-2xs leading-snug text-ink-3 group-open:hidden">{reasons.join("; ")}</span>}
+      </summary>
+      <div className="mt-2 w-64 rounded-md border border-line bg-surface p-2.5 shadow-card">
+        <ConfidenceChecks checks={checks} compact />
+        <p className="mt-2 border-t border-line pt-1.5 text-2xs text-ink-3">
+          {issues.length === 0 ? "All three checks pass." : `${issues.length} check(s) not passed.`} {CONFIDENCE_RULE_TEXT}
+        </p>
+      </div>
+    </details>
+  );
 }
 
 const SEV = {

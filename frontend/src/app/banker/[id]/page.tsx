@@ -7,7 +7,7 @@ import { useState } from "react";
 import { BusinessSwitcher } from "@/components/BusinessSwitcher";
 import { BalanceChart, CashFlowChart, ScoreHistoryChart } from "@/components/charts";
 import { ComparisonView, IndicatorBreakdown, ScoreDial } from "@/components/score";
-import { ConfidenceChip, EmptyState, ErrorState, FlagRow, HumanDecides, Loading, NotFoundBusiness, PageHeader, Panel, ScoreBar } from "@/components/ui";
+import { CONFIDENCE_RULE_TEXT, ConfidenceChecks, ConfidenceChip, EmptyState, ErrorState, FlagRow, HumanDecides, Loading, NotFoundBusiness, PageHeader, Panel, ScoreBar } from "@/components/ui";
 import { api, ApiError, type Assessment, type AssessmentSummary, type Business, type Comparison, type Flag, type Indicator } from "@/lib/api";
 import { dateLabel, inr } from "@/lib/format";
 import { useAsync } from "@/lib/hooks";
@@ -156,7 +156,7 @@ export default function BankerAssessment() {
               <FactorList title="Concerns" items={concerns} tone="bad" />
               <div className="sm:col-span-2">
                 <p className="text-xs leading-relaxed text-ink-2">{a.summary.banker_summary}</p>
-                {a.confidence !== "high" && <p className="mt-1 text-xs text-ink-3">Confidence {a.confidence}: {a.confidence_reasons.join("; ")}.</p>}
+
               </div>
             </div>
           </div>
@@ -191,6 +191,14 @@ export default function BankerAssessment() {
                 </li>
               </ul>
             </div>
+          </div>
+          <div className="mt-4 rounded-md border border-line p-3">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <span className="eyebrow">Why {a.confidence} confidence</span>
+              <ConfidenceChip level={a.confidence} />
+            </div>
+            <ConfidenceChecks checks={a.summary.confidence_checks ?? []} />
+            <p className="mt-2 border-t border-line pt-2 text-2xs text-ink-3">{CONFIDENCE_RULE_TEXT}</p>
           </div>
           <HumanDecides className="mt-4" />
         </Panel>

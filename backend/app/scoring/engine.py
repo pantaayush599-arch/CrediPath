@@ -407,23 +407,58 @@ def band(sub_score: float | None) -> str:
     return "watch"
 
 
-def confidence(bank_months: int, completeness: float | None, scored: int) -> dict:
-    reasons = []
-    if bank_months < 6:
-        reasons.append(f"only {bank_months} months of bank records")
-    if completeness is not None and completeness < 40:
-        reasons.append("records are largely incomplete")
-    if scored <= 5:
-        reasons.append(f"only {scored} of 8 indicators could be scored")
-    if reasons:
-        return {"level": "low", "reasons": reasons}
-    if completeness is not None and completeness < 75:
-        reasons.append("some record types are missing for several months")
-    if scored < 8:
-        reasons.append(f"{8 - scored} indicator(s) lacked enough data")
-    if reasons:
-        return {"level": "medium", "reasons": reasons}
-    return {"level": "high", "reasons": ["12 months of records with good coverage"]}
+def not_applicable(ind_key: str, result: dict) -> bool:
+    """An unscored indicator that simply does not apply to this business.
+
+    A cash/UPI-only shop has no invoices; that is not a data gap.
+    """
+    return ind_key == "invoice_collection" and result["status"] == "insufficient_data" and result["details"].get("invoices", 0) == 0
+
+
+def confidence(bank_months: int, completeness: float | None, results: dict[str, dict]) -> dict:
+    """Confidence level plus the checks behind it, so the reasoning can be shown."""
+    R = C.CONFIDENCE_RULES
+
+    def grade(value: float, rule: dict, higher_is_better: bool = True) -> str:
+        if higher_is_better:
+            return "pass" if value >= rule["pass"] else "warn" if value >= rule["warn"] else "fail"
+        return "pass" if value <= rule["pass"] else "warn" if value <= rule["warn"] else "fail"
+
+    na = [k for k, r in results.items() if not_applicable(k, r)]
+    missing = [C.INDICATOR_BY_KEY[k].name for k, r in results.items() if r["sub_score"] is None and k not in na]
+    applicable = len(results) - len(na)
+    comp = completeness if completeness is not None else 0.0
+    checks = [
+        {
+            "key": "bank_months",
+            "label": "Bank / UPI history",
+            "value": f"{bank_months} of {C.WINDOW_MONTHS} months",
+            "status": grade(bank_months, R["bank_months"]),
+            "rule": f"{R['bank_months']['pass']}+ months passes; {R['bank_months']['warn']}-{R['bank_months']['pass'] - 1} is a warning; fewer fails",
+        },
+        {
+            "key": "completeness",
+            "label": "Record completeness",
+            "value": f"{comp:.0f} / 100",
+            "status": grade(comp, R["completeness"]),
+            "rule": f"{R['completeness']['pass']}+ passes; {R['completeness']['warn']}-{R['completeness']['pass'] - 1} is a warning; lower fails",
+        },
+        {
+            "key": "missing_indicators",
+            "label": "Indicators scored",
+            "value": f"{applicable - len(missing)} of {applicable} applicable"
+            + (f" (not applicable: {', '.join(C.INDICATOR_BY_KEY[k].name.lower() for k in na)})" if na else ""),
+            "status": grade(len(missing), R["missing_indicators"], higher_is_better=False),
+            "rule": f"All applicable passes; up to {R['missing_indicators']['warn']} unscored is a warning; more fails",
+            "detail": ("Not enough data: " + ", ".join(missing)) if missing else None,
+        },
+    ]
+    statuses = {c["status"] for c in checks}
+    level = "low" if "fail" in statuses else "medium" if "warn" in statuses else "high"
+    reasons = [f"{c['label']}: {c['value']}" for c in checks if c["status"] != "pass"] or [
+        f"{bank_months} months of bank data, complete records and all applicable indicators scored"
+    ]
+    return {"level": level, "reasons": reasons, "checks": checks}
 
 
 def score_records(df: pd.DataFrame, as_of: pd.Timestamp | None = None) -> dict:
@@ -464,7 +499,6 @@ def score_records(df: pd.DataFrame, as_of: pd.Timestamp | None = None) -> dict:
             }
         )
     bank_months = int(ms.has_bank.sum())
-    scored = sum(1 for i in indicators if i["sub_score"] is not None)
     return {
         "as_of": w.as_of.date().isoformat(),
         "window_start": w.start.date().isoformat(),
@@ -476,6 +510,6 @@ def score_records(df: pd.DataFrame, as_of: pd.Timestamp | None = None) -> dict:
         "indicators": indicators,
         "monthly": ms,
         "window": w,
-        "confidence": confidence(bank_months, results["data_completeness"]["sub_score"], scored),
+        "confidence": confidence(bank_months, results["data_completeness"]["sub_score"], results),
         "bank_months": bank_months,
     }

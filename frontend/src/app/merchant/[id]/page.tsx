@@ -7,7 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BusinessSwitcher } from "@/components/BusinessSwitcher";
 import { ScoreHistoryChart, WhatIfChart } from "@/components/charts";
 import { ScoreDial } from "@/components/score";
-import { EmptyState, ErrorState, Hypothetical, Loading, NotFoundBusiness, PageHeader, Panel } from "@/components/ui";
+import { ConfidenceChecks, ConfidenceChip, EmptyState, ErrorState, Hypothetical, Loading, NotFoundBusiness, PageHeader, Panel } from "@/components/ui";
 import { api, ApiError, type Assessment, type AssessmentSummary, type Business, type ProgressStatus, type Recommendation, type WhatIf } from "@/lib/api";
 import { dateLabel, signed } from "@/lib/format";
 import { useAsync } from "@/lib/hooks";
@@ -252,6 +252,19 @@ export default function MerchantDashboard() {
               <p className="text-2xs text-ink-3">
                 Based on records up to {dateLabel(a.as_of_date)}. A score is not a loan approval — the bank&apos;s loan officer decides.
               </p>
+              <details className="rounded-md border border-line p-2.5">
+                <summary className="flex cursor-pointer items-center gap-2 text-xs text-ink-2">
+                  How sure is this score? <ConfidenceChip level={a.confidence} />
+                </summary>
+                <div className="mt-2">
+                  <ConfidenceChecks checks={a.summary.confidence_checks ?? []} compact />
+                  <p className="mt-2 text-2xs text-ink-3">
+                    {a.confidence === "high"
+                      ? "You have shared enough records for a reliable score."
+                      : "Sharing more months of records, with all details filled in, will make your score more reliable."}
+                  </p>
+                </div>
+              </details>
             </div>
           </div>
         </Panel>

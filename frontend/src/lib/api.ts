@@ -3,6 +3,15 @@
 export type Band = "strength" | "watch" | "concern" | "insufficient_data";
 export type ProgressStatus = "pending" | "in_progress" | "completed";
 
+export interface ConfidenceCheck {
+  key: string;
+  label: string;
+  value: string;
+  status: "pass" | "warn" | "fail";
+  rule: string;
+  detail?: string | null;
+}
+
 export interface Business {
   id: string;
   name: string;
@@ -18,6 +27,8 @@ export interface Business {
   latest_score: number | null;
   latest_display_score: number | null;
   confidence: string | null;
+  confidence_reasons: string[];
+  confidence_checks: ConfidenceCheck[];
   verification_count: number;
   flag_count: number;
   as_of_date: string | null;
@@ -108,6 +119,7 @@ export interface Assessment {
     watch: string[];
     not_scored: string[];
     source: string;
+    confidence_checks?: ConfidenceCheck[];
   };
   indicators: Indicator[];
   flags: Flag[];
@@ -284,6 +296,7 @@ export interface ScoringConfig {
   window_months: number;
   formula: string;
   bands: { strength_min: number; concern_below: number };
+  confidence_rules: Record<string, { pass: number; warn: number }>;
   indicators: { key: string; name: string; weight: number; metric_label: string; thresholds: [number, number][]; benchmark: number; description: string; rule: string }[];
   anomaly_rules: Record<string, number>;
 }

@@ -2,7 +2,7 @@
 
 import { api, type RecordSchema, type ScoringConfig } from "@/lib/api";
 import { useAsync } from "@/lib/hooks";
-import { ErrorState, HumanDecides, Loading, PageHeader, Panel } from "@/components/ui";
+import { CONFIDENCE_RULE_TEXT, ErrorState, HumanDecides, Loading, PageHeader, Panel } from "@/components/ui";
 
 const STATUS = [
   { area: "Rules-based scoring engine (8 indicators, weighted)", state: "Functional", note: "Python / pandas, unit-tested; same function for both dashboards and the what-if." },
@@ -62,6 +62,42 @@ export default function Methodology() {
             </tr>
           </tbody>
         </table>
+      </Panel>
+
+      <Panel title="Confidence scale (high / medium / low)" subtitle="How much evidence sits behind a score, separate from whether the score is good." bodyClass="overflow-x-auto p-0">
+        <table className="table-base min-w-[560px]">
+          <thead>
+            <tr>
+              <th>Check</th>
+              <th>Pass</th>
+              <th>Warning</th>
+              <th>Fail</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="font-medium">Bank / UPI history in the 12-month window</td>
+              <td className="num">{c.confidence_rules.bank_months.pass}+ months</td>
+              <td className="num">{c.confidence_rules.bank_months.warn}–{c.confidence_rules.bank_months.pass - 1} months</td>
+              <td className="num">&lt; {c.confidence_rules.bank_months.warn} months</td>
+            </tr>
+            <tr>
+              <td className="font-medium">Record completeness (data-completeness sub-score)</td>
+              <td className="num">{c.confidence_rules.completeness.pass}+</td>
+              <td className="num">{c.confidence_rules.completeness.warn}–{c.confidence_rules.completeness.pass - 1}</td>
+              <td className="num">&lt; {c.confidence_rules.completeness.warn}</td>
+            </tr>
+            <tr>
+              <td className="font-medium">Applicable indicators that could not be scored</td>
+              <td className="num">none</td>
+              <td className="num">1–{c.confidence_rules.missing_indicators.warn}</td>
+              <td className="num">more than {c.confidence_rules.missing_indicators.warn}</td>
+            </tr>
+          </tbody>
+        </table>
+        <p className="border-t border-line px-3 py-2 text-xs text-ink-2">
+          {CONFIDENCE_RULE_TEXT} An indicator that does not apply (invoice collection for a business with no credit sales) is excluded from the count.
+        </p>
       </Panel>
 
       <div className="grid gap-5 lg:grid-cols-2">

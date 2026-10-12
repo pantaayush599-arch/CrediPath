@@ -6,7 +6,7 @@ import { useState } from "react";
 import { api, type Business } from "@/lib/api";
 import { inr } from "@/lib/format";
 import { rememberBusiness, useAsync } from "@/lib/hooks";
-import { ConfidenceChip, ErrorState, Loading, SuccessNote } from "@/components/ui";
+import { ConfidenceWithReasons, ErrorState, Loading, SuccessNote } from "@/components/ui";
 
 const LOOP = [
   { step: "Assess", text: "Consented bank/UPI, sales, invoice, supplier and loan records are validated and turned into 8 indicators.", where: "Records & reassessment" },
@@ -101,7 +101,7 @@ export default function Home() {
               <h2 className="text-[13px] font-semibold">Primary walkthrough · {raj.name}</h2>
               <p className="mt-0.5 text-xs text-ink-3">Illustrative business from the deck. Synthetic records; the score below is calculated from them.</p>
             </div>
-            <ConfidenceChip level={raj.confidence} />
+            <ConfidenceWithReasons level={raj.confidence} checks={raj.confidence_checks} />
           </div>
           <div className="grid gap-4 p-4 sm:grid-cols-4">
             <div>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { api, type Business } from "@/lib/api";
 import { dateLabel, inr } from "@/lib/format";
 import { rememberBusiness, useAsync } from "@/lib/hooks";
-import { ConfidenceChip, EmptyState, ErrorState, HumanDecides, Loading, PageHeader } from "@/components/ui";
+import { CONFIDENCE_RULE_TEXT, ConfidenceWithReasons, EmptyState, ErrorState, HumanDecides, Loading, PageHeader } from "@/components/ui";
 
 export default function Portfolio() {
   const { data, error, loading, reload } = useAsync<Business[]>(() => api.businesses(), []);
@@ -58,7 +58,7 @@ export default function Portfolio() {
                     )}
                   </td>
                   <td>
-                    <ConfidenceChip level={b.confidence} />
+                    <ConfidenceWithReasons level={b.confidence} checks={b.confidence_checks} reasons={b.confidence_reasons} />
                   </td>
                   <td className="text-right">
                     {b.verification_count > 0 ? (
@@ -79,6 +79,16 @@ export default function Portfolio() {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      {data && data.length > 0 && (
+        <div className="mt-4 panel p-4 text-xs text-ink-2">
+          <div className="mb-1 font-semibold text-ink">How confidence is decided</div>
+          <p>
+            Confidence says how much evidence sits behind a score, not whether the score is good. Three checks are applied: months of bank / UPI history
+            (9+ passes, 6–8 warns), record completeness (75+ passes, 40–74 warns) and how many applicable indicators could be scored (all passes, up to 2
+            missing warns). {CONFIDENCE_RULE_TEXT} Indicators that do not apply — such as invoices for a cash-only shop — are not counted against the business.
+          </p>
         </div>
       )}
       <HumanDecides className="mt-4" />
