@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { getSession } from "./session";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[]) {
   const [data, setData] = useState<T | null>(null);
@@ -45,6 +46,12 @@ export function rememberBusiness(id: string) {
 export function useCurrentBusiness(): string {
   const [id, setId] = useState(DEFAULT_BUSINESS);
   useEffect(() => {
+    // An owner is always tied to their own business.
+    const own = getSession()?.user;
+    if (own?.role === "merchant" && own.business_id) {
+      setId(own.business_id);
+      return;
+    }
     try {
       setId(localStorage.getItem(BIZ_KEY) || DEFAULT_BUSINESS);
     } catch {}

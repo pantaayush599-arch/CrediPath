@@ -65,7 +65,7 @@ export default function Home() {
           <Link href="/merchant/rajs-bakery" onClick={() => rememberBusiness("rajs-bakery")} className="group flex items-center gap-3 px-4 py-3 hover:bg-sunken/60">
             <Store size={18} className="text-accent" />
             <div className="flex-1">
-              <div className="text-sm font-semibold text-ink">Open the business-owner view</div>
+              <div className="text-sm font-semibold text-ink">Preview the business-owner view</div>
               <div className="text-xs text-ink-3">Plain-language findings, ranked fixes, what-if, progress</div>
             </div>
             <ArrowRight size={16} className="text-ink-3 transition-transform group-hover:translate-x-0.5" />
@@ -129,8 +129,8 @@ export default function Home() {
             </div>
           </div>
           <div className="border-t border-line px-4 py-3 text-xs text-ink-2">
-            <b className="text-ink">Suggested demo:</b> open the lender view (62/100, overdue receivables to verify) → owner view (top 3 fixes, what-if 62 → 73) → Records &amp; reassessment → upload{" "}
-            <span className="num">raj_bakery_update_sep2026.csv</span> → back to the lender view to see the updated profile.
+            <b className="text-ink">Suggested demo:</b> as the banker, open Raj&apos;s assessment (62/100, overdue receivables to verify) → sign out and sign in as Raj (top 3 fixes,
+            what-if 62 → 73) → Records &amp; reassessment → upload <span className="num">raj_bakery_update_sep2026.csv</span> → sign back in as the banker to see the updated profile.
           </div>
         </section>
       )}

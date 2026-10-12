@@ -37,30 +37,51 @@ On macOS/Linux, `./dev.sh` runs both servers after the installs above.
 
 No API keys, paid services or external financial integrations are needed.
 
-## Judging demo (about 5 minutes)
+## Sign-in and sample accounts
 
-1. **Overview** (`/`). The loop, Raj's Bakery at **62/100** (61.75 exact) and the demo businesses.
-2. **Lender view** (`/banker/rajs-bakery`).
-   - Strengths: revenue consistency 85, repayment record 80.
-   - Concerns: cash-flow stability 50, invoice collection 40, data completeness 50.
+The app opens on a **sign-in page with two options**, matching the deck: **MSME owner** (credit score, strengths & concerns, improvement steps) and **Banker** (risk indicators, supporting evidence, anomaly flags). Pick a tab, then click **Use** next to a sample account to fill the form.
+
+| Role | Email | Password | Sees |
+|---|---|---|---|
+| Banker | `officer@demobank.in` | `Banker@123` | Every applicant, assessments, flags, demo reset |
+| MSME owner | `raj@rajsbakery.in` | `Raj@123` | Raj's Bakery only |
+| MSME owner | `meena@meenastore.in` | `Meena@123` | Meena General Store only |
+| MSME owner | `anil@sharmamobile.in` | `Anil@123` | Sharma Mobile & Electronics only |
+| MSME owner | `lata@greenleaf.in` | `Lata@123` | Green Leaf Tiffin Services only |
+
+New owners can **Register** from the sign-in page; that creates the business and its owner account, then they upload a CSV.
+
+Access is enforced by the API, not just hidden in the UI:
+- Every business endpoint checks the signed-in user. An owner asking for another business gets `403`.
+- The applicant list and demo reset are banker-only.
+- Passwords are hashed (PBKDF2), and sessions are signed tokens valid for 12 hours.
+
+This is **demo-grade sign-in**. The sample passwords are public, and there is no MFA, rate limiting or KYC. Set `CREDIPATH_SECRET` to a random value on any deployment.
+
+## Judging demo (about 6 minutes)
+
+1. **Sign-in page.** Point out the two options from the deck. Choose **Banker**, click **Use** on the officer account, and sign in.
+2. **Applicant portfolio** (`/banker`). Four applicants with scores, confidence (click **Why?**) and items to verify.
+3. **Raj's assessment** (`/banker/rajs-bakery`).
+   - Score **62/100** (61.75 exact). Strengths: revenue 85, repayment 80. Concerns: cash flow 50, invoice collection 40, completeness 50.
    - Verify: 4 overdue receivables worth ₹37,500.
-   - The indicator table shows weight × sub-score = points, and the points add up to **61.75**. Click a row to see the raw metric.
-   - The conventional bureau view ("thin file") sits next to the evidence.
-3. **Owner view** (`/merchant/rajs-bakery`).
-   - Plain-language summary and the top 3 fixes: collect overdue invoices **+3.5**, complete records **+3.5**, stabilise cash flow **+3.0**.
-   - The what-if simulator opens on the deck scenario (top 3 + cash buffer **+1.0**): **62 → 73**, labelled hypothetical.
-   - Mark a fix "Done", reload, and the progress is still saved. The score does not change.
-4. **Records & reassessment** (`/merchant/rajs-bakery/records`).
-   - Upload `invalid_example.csv` to see row-level errors and warnings. Nothing is stored until you confirm.
-   - Upload `raj_bakery_update_sep2026.csv` (download links are on the page). It adds 62 new rows, updates 5 invoices to collected, and rescores: **61.75 → 69.50**.
-   - A before/after table shows indicator changes and the flags that cleared, including the overdue receivables.
-5. Back in the **lender view**, the applicant shows the updated profile, the history chart and the latest change.
-6. Optional extras:
-   - **Sharma Mobile & Electronics** shows circular-flow, spike and mismatch flags.
-   - **Green Leaf Tiffin** is new to credit (low confidence; indicators left unscored rather than zeroed).
-   - **Add a business** onboards a new profile with `new_business_sample.csv`.
-   - The **theme toggle** (top right) switches light/dark/system.
-7. **Overview → Restore demo data…** (with a confirmation step) puts everything back.
+   - The indicator table adds up to 61.75; click a row to see the raw metric.
+   - Below it: conventional bureau view vs evidence, why the confidence is medium, charts, flags.
+4. **Sign out, then sign in as Raj** (MSME owner tab).
+   - Plain-language findings and the top 3 fixes: **+3.5 / +3.5 / +3.0**.
+   - The what-if simulator shows **62 → 73** (hypothetical).
+   - Mark a fix "Done": it is saved, and the score does not change.
+   - There is no business switcher; Raj only sees his own business.
+5. **Records & reassessment.**
+   - `invalid_example.csv` shows row-level errors.
+   - `raj_bakery_update_sep2026.csv` imports and rescores: **61.75 → 69.50**, and the overdue-receivable flag clears.
+6. **Sign out, then sign in as the banker again.** Raj now shows **70**, with history and a before/after comparison.
+7. Optional extras:
+   - **Sharma Mobile & Electronics**: circular-flow, spike and mismatch flags.
+   - **Green Leaf Tiffin**: low confidence; click **Why?** to see the failed checks.
+   - **Register** a new business from the sign-in page with `new_business_sample.csv`.
+   - The theme toggle.
+8. **Overview → Restore demo data…** (banker only) resets everything, including demo accounts and registrations.
 
 ## How the score works
 
@@ -157,7 +178,7 @@ The PostgreSQL path was tested against a local PostgreSQL 16 server (the full te
 
 ```bash
 cd backend && source .venv/bin/activate
-python -m pytest -q                                       # 36 tests, temporary SQLite DB
+python -m pytest -q                                       # 37 tests, temporary SQLite DB
 DATABASE_URL=postgresql://user:pass@localhost/db python -m pytest -q   # same suite on PostgreSQL
 
 cd frontend && npm run typecheck && npm run build
@@ -182,8 +203,11 @@ The tests cover:
 
 | Method | Path | Purpose |
 |---|---|---|
-| GET | `/api/businesses` | Portfolio with latest scores |
-| POST | `/api/businesses` | Onboard a business (consent required) |
+| GET | `/api/auth/demo-accounts` | Sample sign-in details (public) |
+| POST | `/api/auth/login` | Sign in; returns a token (send as `Authorization: Bearer …`) |
+| GET | `/api/auth/me` | Current user |
+| GET | `/api/businesses` | Portfolio with latest scores (banker only) |
+| POST | `/api/businesses` | Register a business and its owner account (consent required) |
 | GET | `/api/businesses/{id}/assessment` | Latest assessment: indicators, explanations, flags, plan |
 | GET | `/api/businesses/{id}/assessments` | History |
 | GET | `/api/businesses/{id}/comparison` | Latest vs previous |
@@ -196,7 +220,7 @@ The tests cover:
 | PUT | `/api/businesses/{id}/progress/{action}` | Update progress (does not change the score) |
 | GET | `/api/scoring/config` | Weights, thresholds, rules |
 | GET | `/api/samples`, `/api/samples/{name}` | Sample CSVs |
-| POST | `/api/demo/reset?confirm=true` | Restore demo data |
+| POST | `/api/demo/reset?confirm=true` | Restore demo data (banker only) |
 
 ## What is functional, simulated, or out of scope
 
@@ -206,7 +230,7 @@ The tests cover:
 | What-if results | **Hypothetical**: indicators assumed to reach benchmark, never saved |
 | Explanations | **Template-based** from the scoring output. The deck's LLM explanation layer is not included; no AI API is called |
 | Data | **Synthetic** only |
-| Merchant data separation | The owner view shows only the selected business. The "view as" switcher is a demo convenience; a real deployment needs authentication (not built) |
+| Sign-in and data separation | **Functional, demo-grade.** Owners can only reach their own business (enforced by the API); bankers see all. Public sample passwords; not production authentication |
 | Account Aggregator, GST, ULI feeds; ML scoring; lender workflows; approvals or rejections | **Future scope, not built** (AA appears only as a labelled placeholder) |
 
 ## Project layout
@@ -236,7 +260,7 @@ dist/               backup zips of frontend and backend source
 
 The browser calls `/api/*` on the same domain, so no CORS setup or service bindings are needed. Locally, Next.js proxies `/api/*` to `BACKEND_URL`; on Vercel that proxy is switched off and the top-level rewrite does the routing. To run both services together locally the Vercel way, use `vercel dev`.
 
-**Set `DATABASE_URL` (e.g. Supabase) in the Vercel project settings.** Without it, the backend falls back to SQLite in `/tmp`. That copy is reseeded on every cold start and is not shared between function instances, so uploads, progress and reassessments would not persist reliably. Uploads on Vercel are limited to 4 MB per file.
+**Set `CREDIPATH_SECRET` (any long random string) and `DATABASE_URL` (e.g. Supabase) in the Vercel project settings.** Without `DATABASE_URL`, the backend falls back to SQLite in `/tmp`. That copy is reseeded on every cold start and is not shared between function instances, so uploads, progress and reassessments would not persist reliably. Uploads on Vercel are limited to 4 MB per file.
 
 ## Troubleshooting
 

@@ -4,9 +4,16 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { api, type Business } from "@/lib/api";
 import { rememberBusiness, useAsync } from "@/lib/hooks";
+import { useSession } from "@/lib/session";
 
-/** Demo-only switcher. In the owner view it lists names only, never other businesses' scores. */
-export function BusinessSwitcher({ current, basePath, suffix = "", label }: { current: string; basePath: string; suffix?: string; label: string }) {
+/** Applicant switcher for bankers. Owners never see it: they only have their own business. */
+export function BusinessSwitcher(props: { current: string; basePath: string; suffix?: string; label: string }) {
+  const session = useSession();
+  if (session?.user.role !== "banker") return null;
+  return <Switcher {...props} />;
+}
+
+function Switcher({ current, basePath, suffix = "", label }: { current: string; basePath: string; suffix?: string; label: string }) {
   const router = useRouter();
   const { data } = useAsync<Business[]>(() => api.businesses(), []);
   useEffect(() => rememberBusiness(current), [current]);

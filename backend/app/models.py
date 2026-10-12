@@ -211,3 +211,20 @@ class ActionProgress(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     business: Mapped[Business] = relationship(back_populates="progress")
+
+
+class User(Base):
+    """Demo sign-in account. Bankers see every applicant; a merchant sees only their business."""
+
+    __tablename__ = "users"
+    __table_args__ = (CheckConstraint("role IN ('banker','merchant')", name="ck_user_role"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    email: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    password_hash: Mapped[str] = mapped_column(String(200))
+    role: Mapped[str] = mapped_column(String(10))
+    display_name: Mapped[str] = mapped_column(String(160))
+    organisation: Mapped[str] = mapped_column(String(160), default="")
+    business_id: Mapped[str | None] = mapped_column(ForeignKey("businesses.id", ondelete="CASCADE"), nullable=True)
+    is_demo: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

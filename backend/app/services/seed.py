@@ -13,7 +13,7 @@ import os
 import threading
 
 from ..db import ASSETS_DIR, Base, SessionLocal, engine
-from ..models import ActionProgress, Business
+from ..models import ActionProgress, Business, User
 from ..scoring.record_schema import COLUMNS
 from . import synthetic
 from .assessment import run_assessment
@@ -102,6 +102,10 @@ def seed_demo(db: Session) -> list[str]:
     # Demo progress for a business with history (not Raj, whose plan starts fresh).
     if "meena-general-store" in created:
         db.add(ActionProgress(business_id="meena-general-store", action_key="grow_income", status="in_progress"))
+    db.flush()
+    from ..auth import seed_demo_users
+
+    seed_demo_users(db)
     db.commit()
     return created
 
@@ -112,6 +116,7 @@ def reset_demo(db: Session) -> list[str]:
         db.delete(biz)
     db.flush()
     db.execute(delete(ActionProgress))
+    db.execute(delete(User))
     db.commit()
     return seed_demo(db)
 

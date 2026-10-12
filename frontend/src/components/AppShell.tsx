@@ -1,10 +1,11 @@
 "use client";
 
-import { BookOpenText, Building2, FileUp, Gauge, Landmark, LayoutGrid, Menu, PlusCircle, Store, X } from "lucide-react";
+import { BookOpenText, FileUp, Gauge, Landmark, LayoutGrid, Loader2, LogOut, Menu, Store, X } from "lucide-react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
 import { useCurrentBusiness } from "@/lib/hooks";
+import { clearSession, type SessionUser, useSession } from "@/lib/session";
 import { ThemeToggle } from "./theme";
 
 function NavItem({ href, icon, label, active, onClick }: { href: string; icon: React.ReactNode; label: string; active: boolean; onClick?: () => void }) {
@@ -39,38 +40,91 @@ function Brand() {
   );
 }
 
+const PUBLIC_PATHS = ["/login", "/onboard"];
+
+/** Where a signed-in user may go; anything else redirects to their home. */
+function allowedPath(path: string, user: SessionUser): string | null {
+  if (path === "/methodology") return null;
+  if (user.role === "banker") return null;
+  const own = `/merchant/${user.business_id}`;
+  if (path === own || path.startsWith(own + "/")) return null;
+  return own;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
+  const router = useRouter();
+  const session = useSession();
   const biz = useCurrentBusiness();
   const [open, setOpen] = useState(false);
+  const signingOut = useRef(false);
   useEffect(() => setOpen(false), [path]);
 
+  const isPublic = PUBLIC_PATHS.some((p) => path === p || path.startsWith(p + "/"));
+  const redirect = session === null ? `/login?next=${encodeURIComponent(path)}` : session ? allowedPath(path, session.user) : null;
+  useEffect(() => {
+    if (!isPublic && redirect && !signingOut.current) router.replace(redirect);
+  }, [isPublic, redirect, router]);
+
+  if (isPublic) return <>{children}</>;
+  if (!session || redirect) {
+    return (
+      <div className="flex min-h-screen items-center justify-center gap-2 text-sm text-ink-3">
+        <Loader2 size={16} className="animate-spin" /> Checking your sign-in…
+      </div>
+    );
+  }
+  const user = session.user;
+  const banker = user.role === "banker";
+
+  const signOut = () => {
+    signingOut.current = true; // go to a plain /login, not /login?next=...
+    clearSession();
+    router.replace("/login");
+  };
+
   const is = (p: string, exact = false) => (exact ? path === p : path === p || path.startsWith(p + "/"));
+  const section = (label: string) => <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-nav-ink/60">{label}</div>;
   const nav = (
     <nav className="flex flex-1 flex-col gap-5 overflow-y-auto px-3 py-4">
-      <div className="space-y-0.5">
-        <NavItem href="/" icon={<LayoutGrid size={16} />} label="Overview" active={is("/", true)} />
-      </div>
-      <div>
-        <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-nav-ink/60">Lender · risk view</div>
-        <div className="space-y-0.5">
-          <NavItem href="/banker" icon={<Landmark size={16} />} label="Applicant portfolio" active={is("/banker", true)} />
-          <NavItem href={`/banker/${biz}`} icon={<Gauge size={16} />} label="Assessment" active={path.startsWith("/banker/")} />
+      {banker ? (
+        <>
+          <div className="space-y-0.5">
+            <NavItem href="/" icon={<LayoutGrid size={16} />} label="Overview" active={is("/", true)} />
+          </div>
+          <div>
+            {section("Lender · risk view")}
+            <div className="space-y-0.5">
+              <NavItem href="/banker" icon={<Landmark size={16} />} label="Applicant portfolio" active={is("/banker", true)} />
+              <NavItem href={`/banker/${biz}`} icon={<Gauge size={16} />} label="Assessment" active={path.startsWith("/banker/")} />
+            </div>
+          </div>
+        </>
+      ) : (
+        <div>
+          {section("My business")}
+          <div className="space-y-0.5">
+            <NavItem href={`/merchant/${user.business_id}`} icon={<Store size={16} />} label="My score & plan" active={path.startsWith("/merchant/") && !path.endsWith("/records")} />
+            <NavItem href={`/merchant/${user.business_id}/records`} icon={<FileUp size={16} />} label="Records & reassessment" active={path.startsWith("/merchant/") && path.endsWith("/records")} />
+          </div>
         </div>
-      </div>
+      )}
       <div>
-        <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-nav-ink/60">Business owner · guidance</div>
-        <div className="space-y-0.5">
-          <NavItem href={`/merchant/${biz}`} icon={<Store size={16} />} label="My score & plan" active={path.startsWith("/merchant/") && !path.endsWith("/records")} />
-          <NavItem href={`/merchant/${biz}/records`} icon={<FileUp size={16} />} label="Records & reassessment" active={path.startsWith("/merchant/") && path.endsWith("/records")} />
-          <NavItem href="/onboard" icon={<PlusCircle size={16} />} label="Add a business" active={is("/onboard")} />
-        </div>
-      </div>
-      <div>
-        <div className="mb-1.5 px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-nav-ink/60">Reference</div>
+        {section("Reference")}
         <NavItem href="/methodology" icon={<BookOpenText size={16} />} label="Scoring method" active={is("/methodology")} />
       </div>
     </nav>
+  );
+
+  const account = (
+    <div className="border-t border-white/5 px-4 py-3">
+      <div className="text-[13px] font-medium text-white">{user.display_name}</div>
+      <div className="text-[11px] text-nav-ink/80">{user.organisation}</div>
+      <div className="mt-0.5 text-[10px] uppercase tracking-[0.12em] text-nav-ink/60">{banker ? "Banker" : "MSME owner"} · demo account</div>
+      <button onClick={signOut} className="mt-2 inline-flex items-center gap-1.5 text-[12px] text-nav-ink hover:text-white">
+        <LogOut size={13} /> Sign out
+      </button>
+    </div>
   );
 
   return (
@@ -81,9 +135,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <Brand />
         </div>
         {nav}
-        <div className="border-t border-white/5 px-4 py-3 text-[11px] leading-snug text-nav-ink/70">
-          <Building2 size={12} className="mb-1 inline" /> Prototype · synthetic data only. Scores are not loan decisions.
-        </div>
+        {account}
       </aside>
 
       {/* Mobile drawer */}
@@ -98,6 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             {nav}
+            {account}
           </aside>
         </div>
       )}
@@ -106,11 +159,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <button className="btn-ghost -ml-2 px-2 lg:hidden" onClick={() => setOpen(true)} aria-label="Open menu">
           <Menu size={18} />
         </button>
-        <span className="chip border border-warn/30 bg-warn-soft text-warn" title="All businesses and transactions are fictional">
+        <span className={`chip ${banker ? "bg-brand/10 text-brand" : "bg-accent-soft text-accent"}`}>{banker ? "Banker view" : "MSME owner view"}</span>
+        <span className="chip hidden border border-warn/30 bg-warn-soft text-warn sm:inline-flex" title="All businesses and transactions are fictional">
           Synthetic demo data
         </span>
         <div className="ml-auto flex items-center gap-2">
+          <span className="hidden text-xs text-ink-2 md:inline">{user.display_name}</span>
           <ThemeToggle compact />
+          <button onClick={signOut} className="btn-ghost px-2 text-xs" title="Sign out">
+            <LogOut size={14} /> <span className="hidden sm:inline">Sign out</span>
+          </button>
         </div>
       </header>
       <main className="mx-auto max-w-[1280px] px-4 py-6 sm:px-6">{children}</main>

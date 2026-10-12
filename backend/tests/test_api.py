@@ -11,9 +11,17 @@ SAMPLES = Path(__file__).resolve().parent.parent / "data" / "samples"
 @pytest.fixture(scope="module")
 def client():
     with TestClient(app) as c:
+        c.headers["Authorization"] = "Bearer " + _token(c, "officer@demobank.in", "Banker@123")
         r = c.post("/api/demo/reset?confirm=true")
         assert r.status_code == 200
+        c.headers["Authorization"] = "Bearer " + _token(c, "officer@demobank.in", "Banker@123")
         yield c
+
+
+def _token(c, email, password, role=None):
+    r = c.post("/api/auth/login", json={"email": email, "password": password, "role": role})
+    assert r.status_code == 200, r.text
+    return r.json()["token"]
 
 
 def _upload(client, biz, name, **params):
@@ -97,22 +105,44 @@ def test_reassessment_loop(client):
 
 
 def test_onboard_new_business(client):
-    r = client.post("/api/businesses", json={"name": "Fresh Fruits Co", "owner_name": "Test Owner", "category": "Fruit retail", "city": "Pune", "consent": False})
+    body = {"name": "Fresh Fruits Co", "owner_name": "Test Owner", "category": "Fruit retail", "city": "Pune", "email": "asha@freshfruits.in", "password": "Fruit@123"}
+    r = client.post("/api/businesses", json={**body, "consent": False})
     assert r.status_code == 422
-    r = client.post("/api/businesses", json={"name": "Fresh Fruits Co", "owner_name": "Test Owner", "category": "Fruit retail", "city": "Pune", "consent": True})
+    r = client.post("/api/businesses", json={**body, "consent": True})
     assert r.status_code == 201
-    biz = r.json()["id"]
-    assert client.get(f"/api/businesses/{biz}/assessment").status_code == 404
-    up = _upload(client, biz, "new_business_sample.csv")
+    biz = r.json()["business"]["id"]
+    owner = {"Authorization": "Bearer " + r.json()["token"]}
+    assert client.post("/api/businesses", json={**body, "consent": True}).status_code == 409
+    assert client.get(f"/api/businesses/{biz}/assessment", headers=owner).status_code == 404
+    with open(SAMPLES / "new_business_sample.csv", "rb") as f:
+        up = client.post(f"/api/businesses/{biz}/uploads", files={"file": ("s.csv", f, "text/csv")}, headers=owner)
     assert up.status_code == 201
     assert up.json()["assessment"]["overall_score"] is not None
     assert up.json()["comparison"] is None
+    # The new owner can sign in and sees only their business.
+    assert client.get("/api/businesses/rajs-bakery", headers=owner).status_code == 403
+
+
+def test_login_and_access_control(client):
+    assert client.post("/api/auth/login", json={"email": "raj@rajsbakery.in", "password": "nope"}).status_code == 401
+    assert client.post("/api/auth/login", json={"email": "raj@rajsbakery.in", "password": "Raj@123", "role": "banker"}).status_code == 403
+    raj = {"Authorization": "Bearer " + _token(client, "raj@rajsbakery.in", "Raj@123", "merchant")}
+    assert client.get("/api/auth/me", headers=raj).json()["business_id"] == "rajs-bakery"
+    assert client.get("/api/businesses/rajs-bakery/assessment", headers=raj).status_code == 200
+    assert client.get("/api/businesses/meena-general-store/assessment", headers=raj).status_code == 403
+    assert client.get("/api/businesses", headers=raj).status_code == 403
+    assert client.post("/api/demo/reset?confirm=true", headers=raj).status_code == 403
+    assert client.get("/api/businesses/rajs-bakery", headers={"Authorization": "Bearer junk"}).status_code == 401
+    assert client.get("/api/businesses/rajs-bakery", headers={"Authorization": ""}).status_code == 401
+    accounts = client.get("/api/auth/demo-accounts", headers={"Authorization": ""}).json()
+    assert {a["role"] for a in accounts} == {"banker", "merchant"}
 
 
 def test_reset_restores_original_state(client):
     assert client.post("/api/demo/reset").status_code == 400
     r = client.post("/api/demo/reset?confirm=true")
     assert r.status_code == 200
+    # The banker account is re-created by the reset, so the same token still works.
     rows = client.get("/api/businesses").json()
     assert [b["id"] for b in rows] == ["rajs-bakery", "meena-general-store", "sharma-mobile-electronics", "green-leaf-tiffin"]
     assert rows[0]["latest_score"] == 61.75 and rows[0]["assessment_count"] == 1
@@ -122,7 +152,7 @@ def test_reset_restores_original_state(client):
 
 
 def test_samples_downloadable(client):
-    names = [s["name"] for s in client.get("/api/samples").json()]
+    names = [s["name"] for s in client.get("/api/samples", headers={"Authorization": ""}).json()]
     assert "raj_bakery_update_sep2026.csv" in names
     r = client.get("/api/samples/credipath_template.csv")
     assert r.status_code == 200 and r.text.startswith("record_type,date,amount")

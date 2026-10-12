@@ -99,7 +99,7 @@ export function ScoreBar({ value, band, benchmark }: { value: number | null; ban
 export function ConfidenceChip({ level }: { level: string | null }) {
   if (!level) return null;
   const cls = level === "high" ? "bg-good-soft text-good" : level === "medium" ? "bg-sunken text-ink-2" : "bg-bad-soft text-bad";
-  return <span className={`chip ${cls}`}>{level} confidence</span>;
+  return <span className={`chip whitespace-nowrap ${cls}`}>{level} confidence</span>;
 }
 
 export const CONFIDENCE_RULE_TEXT = "High: all three checks pass. Medium: at least one warning. Low: any check fails.";

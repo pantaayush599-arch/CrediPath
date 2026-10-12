@@ -49,6 +49,22 @@ CREATE TABLE uploads (
 );
 CREATE INDEX ix_uploads_business_id ON uploads (business_id);
 
+CREATE TABLE users (
+	id SERIAL NOT NULL, 
+	email VARCHAR(160) NOT NULL, 
+	password_hash VARCHAR(200) NOT NULL, 
+	role VARCHAR(10) NOT NULL, 
+	display_name VARCHAR(160) NOT NULL, 
+	organisation VARCHAR(160) NOT NULL, 
+	business_id VARCHAR(64), 
+	is_demo BOOLEAN NOT NULL, 
+	created_at TIMESTAMP WITH TIME ZONE NOT NULL, 
+	PRIMARY KEY (id), 
+	CONSTRAINT ck_user_role CHECK (role IN ('banker','merchant')), 
+	FOREIGN KEY(business_id) REFERENCES businesses (id) ON DELETE CASCADE
+);
+CREATE UNIQUE INDEX ix_users_email ON users (email);
+
 CREATE TABLE assessments (
 	id SERIAL NOT NULL, 
 	business_id VARCHAR(64) NOT NULL, 

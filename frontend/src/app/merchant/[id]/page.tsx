@@ -208,7 +208,7 @@ export default function MerchantDashboard() {
           {b.name} · <span className="chip bg-warn-soft text-warn">synthetic demo</span>
         </span>
       }
-      actions={<BusinessSwitcher current={id} basePath="/merchant" label="Demo: view as" />}
+      actions={<BusinessSwitcher current={id} basePath="/merchant" label="Preview owner view of" />}
     />
   );
 

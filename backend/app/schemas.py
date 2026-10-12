@@ -14,6 +14,8 @@ class BusinessCreate(BaseModel):
     city: str = Field(min_length=2, max_length=120)
     years_in_operation: int | None = Field(default=None, ge=0, le=150)
     description: str = Field(default="", max_length=1000)
+    email: str = Field(min_length=5, max_length=160, pattern=r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+    password: str = Field(min_length=6, max_length=100)
     consent: bool = Field(description="Owner consents to these records being used for this assessment")
 
     @field_validator("consent")
@@ -22,6 +24,12 @@ class BusinessCreate(BaseModel):
         if not v:
             raise ValueError("Consent is required before records can be assessed.")
         return v
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=160)
+    password: str = Field(min_length=1, max_length=100)
+    role: Literal["banker", "merchant"] | None = None
 
 
 class BusinessOut(BaseModel):

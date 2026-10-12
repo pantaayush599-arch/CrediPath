@@ -55,7 +55,7 @@ export default function Records() {
         eyebrow="Business owner · records"
         title="Records & reassessment"
         subtitle={`${b.name} · upload updated records to recalculate your assessment`}
-        actions={<BusinessSwitcher current={id} basePath="/merchant" suffix="/records" label="Demo: view as" />}
+        actions={<BusinessSwitcher current={id} basePath="/merchant" suffix="/records" label="Preview owner view of" />}
       />
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">

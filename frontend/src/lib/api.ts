@@ -1,3 +1,5 @@
+import { clearSession, getSession, type Session, type SessionUser } from "./session";
+
 // Typed client for the CrediPath FastAPI backend (proxied at /api by Next.js).
 
 export type Band = "strength" | "watch" | "concern" | "insufficient_data";
@@ -233,8 +235,11 @@ export class ApiError extends Error {
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let res: Response;
+  const session = getSession();
+  const headers = new Headers(init?.headers);
+  if (session) headers.set("Authorization", `Bearer ${session.token}`);
   try {
-    res = await fetch(`/api${path}`, { cache: "no-store", ...init });
+    res = await fetch(`/api${path}`, { cache: "no-store", ...init, headers });
   } catch {
     throw new ApiError(0, "Cannot reach the CrediPath API. If running locally, start the backend on port 8000.");
   }
@@ -255,6 +260,13 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       `The CrediPath API is not reachable at /api (HTTP ${res.status}). Locally, start the backend on port 8000; on Vercel, check that /api/* is routed to the backend service.`,
     );
   }
+  if (res.status === 401 && !path.startsWith("/auth/login")) {
+    // Expired or missing session: go back to the sign-in page.
+    clearSession();
+    if (typeof window !== "undefined" && !window.location.pathname.startsWith("/login")) {
+      window.location.href = `/login?next=${encodeURIComponent(window.location.pathname)}`;
+    }
+  }
   if (!res.ok) {
     const d = body?.detail;
     let msg = typeof d === "string" ? d : d?.message;
@@ -271,11 +283,23 @@ const json = (body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
+export interface DemoAccount {
+  email: string;
+  password: string;
+  role: "banker" | "merchant";
+  display_name: string;
+  organisation: string;
+  business_id: string | null;
+}
+
 export const api = {
+  login: (email: string, password: string, role: "banker" | "merchant") => request<Session>("/auth/login", json({ email, password, role })),
+  me: () => request<SessionUser>("/auth/me"),
+  demoAccounts: () => request<DemoAccount[]>("/auth/demo-accounts"),
   health: () => request<{ status: string; database: string }>("/health"),
   businesses: () => request<Business[]>("/businesses"),
   business: (id: string) => request<Business>(`/businesses/${id}`),
-  createBusiness: (body: Record<string, unknown>) => request<Business>("/businesses", json(body)),
+  register: (body: Record<string, unknown>) => request<Session & { business: Business }>("/businesses", json(body)),
   assessment: (id: string) => request<Assessment>(`/businesses/${id}/assessment`),
   assessments: (id: string) => request<AssessmentSummary[]>(`/businesses/${id}/assessments`),
   comparison: (id: string) => request<Comparison | null>(`/businesses/${id}/comparison`),

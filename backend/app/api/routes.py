@@ -11,10 +11,12 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import backend_label, get_session
-from ..models import ActionProgress, Assessment, Business, Upload
+from ..auth import DEMO_ACCOUNTS, check_business_access, current_user, hash_password, make_token, require_banker, user_dict, verify_password
+from ..models import ActionProgress, Assessment, Business, Upload, User
 from ..schemas import (
     AssessmentOut,
     BusinessCreate,
+    LoginRequest,
     BusinessOut,
     ProgressOut,
     ProgressUpdate,
@@ -33,7 +35,8 @@ from ..scoring.recommend import ACTION_TO_INDICATOR
 router = APIRouter(prefix="/api")
 
 
-def _business(db: Session, business_id: str) -> Business:
+def _business(db: Session, business_id: str, user: User) -> Business:
+    check_business_access(user, business_id)
     biz = db.get(Business, business_id)
     if biz is None:
         raise HTTPException(404, f"Business '{business_id}' not found")
@@ -85,6 +88,28 @@ def health():
     return {"status": "ok", "database": backend_label(), "data": "synthetic demonstration data"}
 
 
+@router.get("/auth/demo-accounts")
+def demo_accounts():
+    """Sample sign-in details for the demo (all fictional)."""
+    return [{k: a[k] for k in ("email", "password", "role", "display_name", "organisation", "business_id")} for a in DEMO_ACCOUNTS]
+
+
+@router.post("/auth/login")
+def login(body: LoginRequest, db: Session = Depends(get_session)):
+    user = db.scalars(select(User).where(User.email == body.email.strip().lower())).first()
+    if user is None or not verify_password(body.password, user.password_hash):
+        raise HTTPException(401, "Incorrect email or password.")
+    if body.role and body.role != user.role:
+        other = "Banker" if user.role == "banker" else "MSME owner"
+        raise HTTPException(403, f"This is a {other} account. Choose the {other} tab to sign in.")
+    return {"token": make_token(user), "user": user_dict(user)}
+
+
+@router.get("/auth/me")
+def me(user: User = Depends(current_user)):
+    return user_dict(user)
+
+
 @router.get("/scoring/config")
 def scoring_config():
     """Weights, thresholds and anomaly rules used by the rules engine."""
@@ -105,14 +130,17 @@ def record_schema():
 
 
 @router.get("/businesses", response_model=list[BusinessOut])
-def list_businesses(db: Session = Depends(get_session)):
+def list_businesses(db: Session = Depends(get_session), user: User = Depends(require_banker)):
     """Portfolio list for the banker dashboard."""
     return [_business_out(db, b) for b in db.scalars(select(Business).order_by(Business.is_seeded.desc(), Business.created_at, Business.name))]
 
 
-@router.post("/businesses", response_model=BusinessOut, status_code=201)
+@router.post("/businesses", status_code=201)
 def create_business(body: BusinessCreate, db: Session = Depends(get_session)):
-    """Onboard a new business profile. Records are added with a CSV upload."""
+    """Register a new business and its owner's sign-in. Records are added with a CSV upload."""
+    email = body.email.strip().lower()
+    if db.scalars(select(User).where(User.email == email)).first():
+        raise HTTPException(409, "An account with this email already exists. Sign in instead.")
     slug = re.sub(r"[^a-z0-9]+", "-", body.name.lower()).strip("-")[:48] or "business"
     biz_id, n = slug, 2
     while db.get(Business, biz_id) is not None:
@@ -132,32 +160,36 @@ def create_business(body: BusinessCreate, db: Session = Depends(get_session)):
         consent_given_at=datetime.now(timezone.utc),
     )
     db.add(biz)
+    db.flush()
+    owner = User(email=email, password_hash=hash_password(body.password), role="merchant", display_name=biz.owner_name, organisation=biz.name, business_id=biz.id)
+    db.add(owner)
     db.commit()
-    return _business_out(db, biz)
+    return {"token": make_token(owner), "user": user_dict(owner), "business": _business_out(db, biz)}
 
 
 @router.get("/businesses/{business_id}", response_model=BusinessOut)
-def get_business(business_id: str, db: Session = Depends(get_session)):
-    return _business_out(db, _business(db, business_id))
+def get_business(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    return _business_out(db, _business(db, business_id, user))
 
 
 @router.get("/businesses/{business_id}/assessment", response_model=AssessmentOut)
-def get_latest_assessment(business_id: str, db: Session = Depends(get_session)):
+def get_latest_assessment(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Latest assessment: score, indicators, explanations, flags and ranked recommendations."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     return svc.assessment_dict(db, _latest(db, business_id))
 
 
 @router.get("/businesses/{business_id}/assessments")
-def list_assessments(business_id: str, db: Session = Depends(get_session)):
+def list_assessments(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Assessment history, newest first."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     rows = db.scalars(select(Assessment).where(Assessment.business_id == business_id).order_by(Assessment.id.desc())).all()
     return [svc.assessment_summary(a) for a in rows]
 
 
 @router.get("/businesses/{business_id}/assessments/{assessment_id}", response_model=AssessmentOut)
-def get_assessment(business_id: str, assessment_id: int, db: Session = Depends(get_session)):
+def get_assessment(business_id: str, assessment_id: int, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    check_business_access(user, business_id)
     a = db.get(Assessment, assessment_id)
     if a is None or a.business_id != business_id:
         raise HTTPException(404, "Assessment not found")
@@ -165,17 +197,17 @@ def get_assessment(business_id: str, assessment_id: int, db: Session = Depends(g
 
 
 @router.get("/businesses/{business_id}/comparison")
-def get_comparison(business_id: str, db: Session = Depends(get_session)):
+def get_comparison(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Latest assessment compared with the one before it (null if only one exists)."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     cur = _latest(db, business_id)
     return svc.compare(svc.previous_assessment(db, cur), cur)
 
 
 @router.post("/businesses/{business_id}/assess", response_model=AssessmentOut, status_code=201)
-def reassess(business_id: str, db: Session = Depends(get_session)):
+def reassess(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Recalculate from the stored records and save a new assessment."""
-    biz = _business(db, business_id)
+    biz = _business(db, business_id, user)
     try:
         a = svc.run_assessment(db, biz, trigger="manual")
     except ValueError as e:
@@ -185,9 +217,9 @@ def reassess(business_id: str, db: Session = Depends(get_session)):
 
 
 @router.get("/businesses/{business_id}/explanations")
-def explanations(business_id: str, db: Session = Depends(get_session)):
+def explanations(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Indicator-level explanations and flags from the latest assessment."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     a = _latest(db, business_id)
     d = svc.assessment_dict(db, a)
     return {
@@ -199,24 +231,24 @@ def explanations(business_id: str, db: Session = Depends(get_session)):
 
 
 @router.get("/businesses/{business_id}/recommendations")
-def recommendations(business_id: str, db: Session = Depends(get_session)):
+def recommendations(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Ranked improvement plan with the merchant's progress on each action."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     a = _latest(db, business_id)
     return {"assessment_id": a.id, "items": svc.assessment_dict(db, a)["recommendations"]}
 
 
 @router.post("/businesses/{business_id}/what-if", response_model=WhatIfOut)
-def what_if(business_id: str, body: WhatIfRequest, db: Session = Depends(get_session)):
+def what_if(business_id: str, body: WhatIfRequest, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Hypothetical score for selected actions. Never saved and never changes the assessment."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     a = _latest(db, business_id)
     return {"assessment_id": a.id, **svc.run_what_if(a, body.actions)}
 
 
 @router.get("/businesses/{business_id}/progress", response_model=list[ProgressOut])
-def get_progress(business_id: str, db: Session = Depends(get_session)):
-    _business(db, business_id)
+def get_progress(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    _business(db, business_id, user)
     return [
         {"action_key": p.action_key, "status": p.status, "note": p.note, "updated_at": p.updated_at.isoformat()}
         for p in svc.progress_map(db, business_id).values()
@@ -224,9 +256,9 @@ def get_progress(business_id: str, db: Session = Depends(get_session)):
 
 
 @router.put("/businesses/{business_id}/progress/{action_key}", response_model=ProgressOut)
-def set_progress(business_id: str, action_key: str, body: ProgressUpdate, db: Session = Depends(get_session)):
+def set_progress(business_id: str, action_key: str, body: ProgressUpdate, db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Update progress on an action. Does not change the score."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     if action_key not in ACTION_TO_INDICATOR:
         raise HTTPException(404, f"Unknown action '{action_key}'")
     p = svc.progress_map(db, business_id).get(action_key)
@@ -255,9 +287,9 @@ def _report_out(report: dict, filename: str) -> dict:
 
 
 @router.post("/businesses/{business_id}/uploads/validate", response_model=ValidationReport)
-async def validate_upload(business_id: str, file: UploadFile = File(...), db: Session = Depends(get_session)):
+async def validate_upload(business_id: str, file: UploadFile = File(...), db: Session = Depends(get_session), user: User = Depends(current_user)):
     """Validate a CSV without storing anything."""
-    _business(db, business_id)
+    _business(db, business_id, user)
     content = await _read_upload(file)
     try:
         report = validate_csv(content)
@@ -272,9 +304,10 @@ async def upload(
     file: UploadFile = File(...),
     skip_invalid: bool = Query(False, description="Import valid rows even if some rows have errors"),
     db: Session = Depends(get_session),
+    user: User = Depends(current_user),
 ):
     """Validate, store and reassess. Invoices and loan instalments are upserted by reference."""
-    biz = _business(db, business_id)
+    biz = _business(db, business_id, user)
     content = await _read_upload(file)
     filename = file.filename or "upload.csv"
     try:
@@ -312,8 +345,8 @@ async def upload(
 
 
 @router.get("/businesses/{business_id}/uploads")
-def list_uploads(business_id: str, db: Session = Depends(get_session)):
-    _business(db, business_id)
+def list_uploads(business_id: str, db: Session = Depends(get_session), user: User = Depends(current_user)):
+    _business(db, business_id, user)
     rows = db.scalars(select(Upload).where(Upload.business_id == business_id).order_by(Upload.id.desc())).all()
     return [
         {
@@ -348,7 +381,7 @@ def get_sample(name: str):
 
 
 @router.post("/demo/reset")
-def demo_reset(confirm: bool = Query(False), db: Session = Depends(get_session)):
+def demo_reset(confirm: bool = Query(False), db: Session = Depends(get_session), user: User = Depends(require_banker)):
     """Delete all businesses, uploads, assessments and progress, then reseed the demo."""
     if not confirm:
         raise HTTPException(400, "Pass confirm=true to restore the demo data.")
