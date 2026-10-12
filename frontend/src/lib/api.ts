@@ -246,6 +246,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   } catch {
     body = text;
   }
+  // A non-JSON reply means the request never reached FastAPI (e.g. the frontend's own
+  // 404 page because /api is not routed to the backend). Don't mistake it for "not found".
+  const isJson = (res.headers.get("content-type") || "").includes("application/json");
+  if (!isJson && (!res.ok || typeof body === "string")) {
+    throw new ApiError(
+      0,
+      `The CrediPath API is not reachable at /api (HTTP ${res.status}). Locally, start the backend on port 8000; on Vercel, check that /api/* is routed to the backend service.`,
+    );
+  }
   if (!res.ok) {
     const d = body?.detail;
     let msg = typeof d === "string" ? d : d?.message;

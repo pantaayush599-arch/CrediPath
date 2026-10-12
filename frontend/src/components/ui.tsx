@@ -2,6 +2,8 @@
 
 import { AlertOctagon, AlertTriangle, CheckCircle2, Info, Loader2, RefreshCw, ShieldCheck, XCircle } from "lucide-react";
 import Link from "next/link";
+import { useEffect } from "react";
+import { DEFAULT_BUSINESS, rememberBusiness } from "@/lib/hooks";
 import type { Band, ConfidenceCheck, Flag } from "@/lib/api";
 
 export function PageHeader({ eyebrow, title, subtitle, actions }: { eyebrow?: string; title: React.ReactNode; subtitle?: React.ReactNode; actions?: React.ReactNode }) {
@@ -220,9 +222,16 @@ export function SuccessNote({ children }: { children: React.ReactNode }) {
 }
 
 export function NotFoundBusiness() {
+  // The remembered business no longer exists (e.g. removed by a demo reset):
+  // point the sidebar links back at the default demo business.
+  useEffect(() => rememberBusiness(DEFAULT_BUSINESS), []);
   return (
     <EmptyState title="Business not found">
-      It may have been removed by a demo reset. <Link className="text-accent underline" href="/banker">Open the portfolio</Link>.
+      <p>This business is not in the database any more. Businesses added during the demo are removed when demo data is restored, and on a deployment without a persistent database the data also resets when the server restarts.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        <Link className="btn-primary" href={`/merchant/${DEFAULT_BUSINESS}`}>Open Raj&apos;s Bakery</Link>
+        <Link className="btn-secondary" href="/banker">Open the portfolio</Link>
+      </div>
     </EmptyState>
   );
 }
