@@ -1,0 +1,12 @@
+record_type,date,amount,direction,counterparty,category,channel,reference,due_date,paid_date,balance_after,notes
+bank,2026-08-07,31250,credit,PhonePe Merchant Settlement,sales,UPI,,,,102400,valid row
+bank,2026-08-08,-5000,debit,Patil Dairy,supplier,UPI,,,,97400,negative amount
+bank,2026-08-09,12000,,Kumar Packaging,supplier,UPI,,,,85400,missing direction
+invoice,2026-08-10,9000,,Brew Corner Cafe,,NEFT,INV-1,,,,missing due date
+invoice,2026-08-10,9000,,Hotel Sai Palace,,NEFT,INV-2,2026-08-01,,,due date before invoice date
+sale,31/13/2026,150000,,,,UPI,,,,,impossible date
+receipt,2026-08-12,4000,,,,,,,,,unknown record type
+sale,2026-08-31,abc,,,,UPI,,,,,amount not a number
+supplier_payment,2026-08-15,8000,,,,,,,,,missing supplier name
+loan_repayment,2026-08-05,15000,,Bank of Maharashtra,,NACH,MUDRA-0001,,2026-08-05,,valid row
+bank,2026-08-20,21000,credit,,,cash,,,,,valid but missing recommended fields

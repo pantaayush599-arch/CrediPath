@@ -1,0 +1,137 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Semantic tokens (RGB triplets). Light and dark are designed separately, not inverted. */
+:root {
+  color-scheme: light;
+  --canvas: 246 244 239;      /* warm paper */
+  --surface: 255 255 255;
+  --sunken: 240 237 230;
+  --line: 226 222 213;
+  --line-strong: 205 200 189;
+  --ink: 17 26 43;            /* navy ink */
+  --ink-2: 71 81 101;
+  --ink-3: 112 120 137;
+  --brand: 19 41 75;          /* deep navy */
+  --brand-ink: 255 255 255;
+  --accent: 14 116 110;       /* muted teal (text-safe) */
+  --accent-soft: 223 240 237;
+  --good: 22 119 64;
+  --good-soft: 226 242 231;
+  --warn: 154 88 6;
+  --warn-soft: 251 239 214;
+  --bad: 176 35 24;
+  --bad-soft: 251 231 228;
+  --nav: 19 33 58;
+  --nav-ink: 197 207 225;
+  --nav-active: 35 55 92;
+  --shadow: 17 26 43;
+
+  /* Chart roles (validated: scripts/validate_palette.js, light surface) */
+  --series-in: #00908a;
+  --series-out: #d4761a;
+  --series-3: #5b5bd6;
+  --chart-grid: #e7e3da;
+  --chart-axis: #707889;
+  --chart-surface: #ffffff;
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: 12 17 26;
+  --surface: 21 27 38;
+  --sunken: 16 22 32;
+  --line: 40 50 66;
+  --line-strong: 58 70 90;
+  --ink: 232 235 241;
+  --ink-2: 168 178 195;
+  --ink-3: 125 136 155;
+  --brand: 125 162 230;
+  --brand-ink: 12 17 26;
+  --accent: 64 190 178;
+  --accent-soft: 18 52 54;
+  --good: 92 196 134;
+  --good-soft: 20 48 36;
+  --warn: 226 166 78;
+  --warn-soft: 56 42 18;
+  --bad: 240 120 108;
+  --bad-soft: 62 26 26;
+  --nav: 9 13 21;
+  --nav-ink: 160 172 194;
+  --nav-active: 27 36 52;
+  --shadow: 0 0 0;
+
+  /* Chart roles (validated against the dark surface #151b26) */
+  --series-in: #1a9e9a;
+  --series-out: #d0782a;
+  --series-3: #7a80e6;
+  --chart-grid: #263041;
+  --chart-axis: #8a94a6;
+  --chart-surface: #151b26;
+}
+
+html,
+body {
+  background: rgb(var(--canvas));
+  color: rgb(var(--ink));
+}
+
+body {
+  font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+.num {
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  .panel {
+    @apply min-w-0 rounded-md border border-line bg-surface;
+  }
+  .panel-head {
+    @apply flex items-center justify-between gap-3 border-b border-line px-4 py-3;
+  }
+  .eyebrow {
+    @apply text-2xs font-semibold uppercase tracking-[0.08em] text-ink-3;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/60 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn border-brand bg-brand text-brand-ink hover:bg-brand/90;
+  }
+  .btn-secondary {
+    @apply btn border-line-strong bg-surface text-ink hover:bg-sunken;
+  }
+  .btn-ghost {
+    @apply btn border-transparent text-ink-2 hover:bg-sunken hover:text-ink;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide;
+  }
+  .input {
+    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2 text-sm text-ink placeholder:text-ink-3 focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/30;
+  }
+  .table-base {
+    @apply w-full border-collapse text-sm;
+  }
+  .table-base th {
+    @apply border-b border-line px-3 py-2 text-left text-2xs font-semibold uppercase tracking-wide text-ink-3;
+  }
+  .table-base td {
+    @apply border-b border-line/70 px-3 py-2 align-top;
+  }
+}
+
+/* Recharts tooltip / surfaces follow the theme */
+.recharts-default-tooltip {
+  background: rgb(var(--surface)) !important;
+  border: 1px solid rgb(var(--line-strong)) !important;
+  border-radius: 6px;
+}
+.recharts-cartesian-axis-tick-value {
+  fill: var(--chart-axis);
+}
